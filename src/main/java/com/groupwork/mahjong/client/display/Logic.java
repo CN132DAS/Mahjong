@@ -1,18 +1,18 @@
 package com.groupwork.mahjong.client.display;
 
-import com.groupwork.mahjong.Mahjong;
 import com.groupwork.mahjong.MahjongClient;
 import com.groupwork.mahjong.MahjongServer;
-import com.groupwork.mahjong.client.gameplay.GameStage;
+import com.groupwork.mahjong.client.action.PossibleAction;
 import com.groupwork.mahjong.common.message.Messages;
 import com.groupwork.mahjong.common.tiles.Tile;
 import java.io.IOException;
 import java.net.InetAddress;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
-
-import javafx.animation.AnimationTimer;
 import javafx.event.EventHandler;
 import javafx.scene.control.Alert;
+import javafx.scene.control.Button;
 import javafx.scene.control.TextInputDialog;
 import javafx.scene.input.MouseEvent;
 
@@ -21,23 +21,19 @@ public class Logic {
         try {
             MahjongServer server = new MahjongServer();
             new Thread(server, "server-thread").start();
-            Mahjong.getInstance().setServer(server);
         } catch (IOException e) {
             Util.showAlert(Alert.AlertType.ERROR, "服务器创建失败", "请重试", null);
             return;
         }
         while (true) {
             int result =
-                    Mahjong.getInstance()
-                            .getClient()
-                            .connect(InetAddress.ofLiteral("127.0.0.1"), true);
+                    MahjongClient.getInstance().connect(InetAddress.ofLiteral("127.0.0.1"), true);
             if (result == 0) break;
             try {
                 Thread.sleep(200);
             } catch (InterruptedException _) {
             }
         }
-        Mahjong.getInstance().setGameStage(GameStage.SERVER_LOBBY);
     }
 
     public static void connectServer(MouseEvent event) {
@@ -57,24 +53,22 @@ public class Logic {
                 }
             } else return;
         }
-        int result = Mahjong.getInstance().getClient().connect(address, false);
+        int result = MahjongClient.getInstance().connect(address, false);
         if (result != 0) {
             Util.showAlert(Alert.AlertType.ERROR, "错误", "连接失败!", "网络超时或服务器不存在");
-            return;
         }
-        Mahjong.getInstance().getGameplay().setGameStage(GameStage.SERVER_LOBBY);
     }
 
     public static void start(MouseEvent event) {
-        MahjongClient client = Mahjong.getInstance().getClient();
+        MahjongClient client = MahjongClient.getInstance();
         client.sendMessage(
                 new Messages.GameStateEvent(
-                        Messages.GameStateEvent.Type.START, (byte) -1, (byte) -1));
+                        Messages.GameStateEvent.Type.GAME_START_PRE, (byte) -1, (byte) -1));
     }
 
     public static EventHandler<MouseEvent> leave(byte id) {
         return event -> {
-            MahjongClient client = Mahjong.getInstance().getClient();
+            MahjongClient client = MahjongClient.getInstance();
             client.sendMessage(
                     new Messages.PlayerLeave(id, Messages.PlayerLeave.Reason.DISCONNECT));
         };
@@ -82,44 +76,40 @@ public class Logic {
 
     public static EventHandler<MouseEvent> kick(byte id) {
         return event -> {
-            MahjongClient client = Mahjong.getInstance().getClient();
+            MahjongClient client = MahjongClient.getInstance();
             client.sendMessage(new Messages.PlayerLeave(id, Messages.PlayerLeave.Reason.KICKED));
         };
     }
 
     public static EventHandler<MouseEvent> aiRelevant(byte id, Messages.AIChange.Type type) {
         return event -> {
-            MahjongClient client = Mahjong.getInstance().getClient();
+            MahjongClient client = MahjongClient.getInstance();
             client.sendMessage(new Messages.AIChange(id, type));
         };
     }
 
     public static EventHandler<MouseEvent> changePos(byte id) {
         return event -> {
-            MahjongClient client = Mahjong.getInstance().getClient();
-            client.sendMessage(new Messages.PosChange(client.getGameData().getLocalId(), id));
+            MahjongClient client = MahjongClient.getInstance();
+            client.sendLocalMessage(id1 -> new Messages.PosChange((byte) id1, id));
         };
     }
 
     public static EventHandler<MouseEvent> onClickTile(Tile tile) {
         return event -> {
-            MahjongClient client = Mahjong.getInstance().getClient();
-            client.sendMessage(
-                    new Messages.PlayerAction(
-                            client.getGameData().getLocalId(),
-                            Messages.PlayerAction.Type.DISCARD,
-                            (byte) 1,
-                            new Tile[] {tile}));
+            MahjongClient client = MahjongClient.getInstance();
+            client.sendLocalMessage(
+                    id ->
+                            new Messages.PlayerAction(
+                                    (byte) id, Messages.PlayerAction.Type.DISCARD, tile));
         };
     }
 
-//    public static AnimationTimer getTimer(){
-//        return new AnimationTimer() {
-//            long lastTime
-//            @Override
-//            public void handle(long now) {
-//
-//            }
-//        }
-//    }
+    public static List<Button> actionButtons(PossibleAction actions) {
+        List<Button> buttons = new ArrayList<>();
+        for (var action : actions.actions()) {
+            buttons.add(action.asActionButton());
+        }
+        return buttons;
+    }
 }

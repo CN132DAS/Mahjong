@@ -1,5 +1,6 @@
 package com.groupwork.mahjong.client.gameplay;
 
+import com.groupwork.mahjong.client.display.Screen;
 import java.util.function.Supplier;
 import javafx.scene.Parent;
 import javafx.scene.Scene;
@@ -25,9 +26,9 @@ public enum GameStage {
             Scene newScene = new Scene(parent);
             width = Math.max(width, newScene.getWidth());
             height = Math.max(height, newScene.getHeight());
-            stage.setScene(newScene);
             stage.setWidth(width);
             stage.setHeight(height);
+            stage.setScene(newScene);
         } else {
             stage.setScene(new Scene(renderLogic.get()));
         }

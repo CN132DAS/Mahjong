@@ -1,9 +1,6 @@
-package com.groupwork.mahjong.client.gameplay;
+package com.groupwork.mahjong.client.display;
 
-import com.groupwork.mahjong.Mahjong;
-import com.groupwork.mahjong.client.display.Logic;
-import com.groupwork.mahjong.client.display.Player;
-import com.groupwork.mahjong.client.display.Util;
+import com.groupwork.mahjong.MahjongClient;
 import com.groupwork.mahjong.common.GameData;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
@@ -17,8 +14,8 @@ import javafx.scene.paint.Color;
 import javafx.scene.text.Text;
 import javafx.scene.text.TextAlignment;
 
-class Screen {
-    static Parent setMainMenu() {
+public class Screen {
+    public static Parent setMainMenu() {
         Text title = Util.textWithFont("麻将\nMahjong", 80);
         title.setTextAlignment(TextAlignment.CENTER);
 
@@ -35,7 +32,7 @@ class Screen {
         return content;
     }
 
-    static Parent setServerLobby() {
+    public static Parent setServerLobby() {
         Region spacing0 = new Region();
         VBox.setVgrow(spacing0, Priority.ALWAYS);
 
@@ -48,7 +45,7 @@ class Screen {
         VBox playerList = new VBox();
         playerList.setSpacing(50);
         byte i = 0;
-        for (var player : Mahjong.getInstance().getClient().getGameData().getPlayerData()) {
+        for (var player : MahjongClient.getInstance().getGameData().getPlayerData()) {
             playerList.getChildren().add(Player.getInfoDisplay(player, i));
             i++;
         }
@@ -76,7 +73,7 @@ class Screen {
 
             Region spacing2 = new Region();
             HBox.setHgrow(spacing2, Priority.ALWAYS);
-            if (Mahjong.getInstance().getClient().isAdmin()) {
+            if (MahjongClient.getInstance().getGameData().isAdmin()) {
                 Button start = Util.buttonWithFont("开始游戏", 30);
                 start.addEventHandler(MouseEvent.MOUSE_CLICKED, Logic::start);
 
@@ -94,20 +91,34 @@ class Screen {
         return content;
     }
 
-    static Parent setInGame() {
-        GameData.Client data = Mahjong.getInstance().getClient().getGameData();
+    public static Parent setInGame() {
+        GameData.Client data = MahjongClient.getInstance().getGameData();
         byte localId = data.getLocalId();
         byte currentPlayerId = data.getCurrentPlayerId();
         Pane[] tiles = new Pane[4];
         for (int i = 0; i <= 3; i++)
             tiles[i] =
                     Player.getTilesDisplay(
-                            data.getPlayerTiles()[(localId + i) % 4],
+                            data.getPlayerData()[(localId + i) % 4],
                             Util.Rotation.values()[i],
                             i == 0 && data.isYourTurn());
 
+        VBox local = new VBox();
+        local.setSpacing(10);
+        HBox localInfo = new HBox();
+        localInfo.setPadding(new Insets(0, 300, 0, 300));
+        localInfo.setAlignment(Pos.CENTER_RIGHT);
+        if (data.isYourTurn() || data.getPossibleAction() != null) {
+            var children = localInfo.getChildren();
+            var actions = data.getPossibleAction();
+            if (actions != null && !actions.actions().isEmpty())
+                children.addAll(Logic.actionButtons(actions));
+            children.add(Util.textWithFont(data.getTickCount() + "", 25));
+        }
+        local.getChildren().addAll(localInfo, tiles[0]);
+
         BorderPane result = new BorderPane();
-        result.setBottom(tiles[0]);
+        result.setBottom(local);
         result.setRight(tiles[1]);
         result.setTop(tiles[2]);
         result.setLeft(tiles[3]);
@@ -117,9 +128,7 @@ class Screen {
             byte id = (byte) ((localId + i) % 4);
             discardedTiles[i] =
                     Player.getDiscardedTilesDisplay(
-                            data.getPlayerData()[id].getDescriptionString(id),
-                            data.getPlayerTiles()[id],
-                            id);
+                            data.getPlayerDescription(id), data.getPlayerData()[id], id);
         }
 
         HBox center = new HBox();
@@ -131,11 +140,9 @@ class Screen {
 
         VBox centerMiddle = new VBox();
         String currentPlayer =
-                currentPlayerId == -1
-                        ? "无"
-                        : data.getPlayerData()[currentPlayerId].getDescriptionString(
-                                currentPlayerId);
-        Text roundInfo = Util.textWithFont("当前回合:\n" + currentPlayer, 15);
+                currentPlayerId == -1 ? "无" : data.getPlayerDescription(currentPlayerId);
+        String info = "当前回合:\n%s\n剩余牌量:%d".formatted(currentPlayer, data.getSpareNum());
+        Text roundInfo = Util.textWithFont(info, 15);
         roundInfo.setTextAlignment(TextAlignment.CENTER);
         VBox centerMiddleSpacing = new VBox(roundInfo);
         centerMiddleSpacing.setAlignment(Pos.CENTER);
@@ -153,6 +160,7 @@ class Screen {
                         centerSpacing2,
                         discardedTiles[1]);
         result.setCenter(center);
+        result.setPadding(new Insets(10, 10, 10, 10));
 
         return result;
     }

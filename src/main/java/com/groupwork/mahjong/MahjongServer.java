@@ -13,7 +13,7 @@ import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.net.SocketTimeoutException;
-import java.util.Arrays;
+import java.util.*;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
@@ -21,6 +21,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 public class MahjongServer implements Runnable {
     public static final int PORT = 25364;
+    public static final byte TICK_COUNT = 30;
 
     private Thread thread;
     private volatile boolean running = true;
@@ -57,103 +58,237 @@ public class MahjongServer implements Runnable {
                 }
             if (!running) break;
             listenerHandler.listening = false;
-            game();
+            gameData.init();
+            gameLoop();
+            gameData.destruct();
             listenerHandler.listening = true;
         }
     }
 
-    private void game() {
-        gameData.init();
-        byte currentPlayerId = gameData.getCurrentPlayerId();
-        for (int round = 1; round <= 3; round++)
-            for (int i = 0; i < listenerHandler.currentPlayers.get(); i++) {
-                drawTile(currentPlayerId, true, 4);
-                currentPlayerId = gameData.getNextPlayerId();
-            }
-        for (int i = 0; i < listenerHandler.currentPlayers.get(); i++) {
-            drawTile(currentPlayerId, true, 1);
-            currentPlayerId = gameData.getNextPlayerId();
-        }
-        while (!gameData.getSpareTiles().isEmpty()) {
-            drawTile(currentPlayerId, false, 1);
-            podcast(new Messages.PLayerTurn(currentPlayerId));
-            switch (gameData.getPlayerData()[currentPlayerId].getType()) {
-                case FAKE -> {
-                    try {
-                        Thread.sleep(2000);
-                    } catch (InterruptedException e) {
-                        if (!running) return;
-                    }
-                    Tile tile =
-                            FakePlayerUtil.calculateTileToDiscard(
-                                    gameData.getPlayerTiles()[currentPlayerId].tileInHand);
-                    gameData.getPlayerTiles()[currentPlayerId].tileInHand.remove(tile);
-                    gameData.getPlayerTiles()[currentPlayerId].tileDiscarded.add(tile);
+    private void gameLoop() {
+        gamePreDraw();
+        podcast(
+                new Messages.GameStateEvent(
+                        Messages.GameStateEvent.Type.GAME_START, (byte) -1, (byte) -1));
+        drawTile(false, true, 1, false);
+        while (!gameData.getSpareTiles().isEmpty() && running) {
+            Messages.PlayerAction messagePre = actionBeforeDiscard();
+            if (!running || messagePre == null) return;
+            Tile messageTile = messagePre.tile();
+            switch (messagePre.type()) {
+                case DISCARD -> {
+                    gameData.handleDiscard(messageTile);
+                    podcast(messagePre);
+                }
+                case GANG -> {
+                    if (!gameData.handleJiaGang(messageTile)) gameData.handleAnGang(messageTile);
+                    podcast(messagePre);
+                    drawTile(false, true, 1, true);
+                    continue;
+                }
+                case HU -> {
+                    byte playerId = gameData.getCurrentPlayerId();
                     podcast(
-                            new Messages.PlayerAction(
-                                    currentPlayerId,
-                                    Messages.PlayerAction.Type.DISCARD,
-                                    (byte) 1,
-                                    new Tile[] {tile}));
-                }
-                case REMOTE -> {
-                    boolean flag = true;
-                    while (flag) {
-                        try {
-                            Messages.PlayerAction message =
-                                    inGameMessage.poll(30, TimeUnit.SECONDS);
-                            if (message == null) {
-                                Tile tile =
-                                        FakePlayerUtil.calculateTileToDiscard(
-                                                gameData.getPlayerTiles()[currentPlayerId]
-                                                        .tileInHand);
-                                podcast(
-                                        new Messages.PlayerAction(
-                                                currentPlayerId,
-                                                Messages.PlayerAction.Type.DISCARD,
-                                                (byte) 1,
-                                                new Tile[] {tile}));
-                                flag = false;
-                            } else if (message.id() == currentPlayerId) {
-                                if (message.type() == Messages.PlayerAction.Type.DISCARD) {
-                                    Tile tile = message.tiles()[0];
-                                    gameData.getPlayerTiles()[currentPlayerId].tileInHand.remove(
-                                            tile);
-                                    gameData.getPlayerTiles()[currentPlayerId].tileDiscarded.add(
-                                            tile);
-                                    podcast(
-                                            new Messages.PlayerAction(
-                                                    currentPlayerId,
-                                                    Messages.PlayerAction.Type.DISCARD,
-                                                    (byte) 1,
-                                                    message.tiles()));
-                                    flag = false;
-                                }
-                            }
-                        } catch (InterruptedException _) {
-                            if (!running) return;
-                        }
-                    }
+                            new Messages.GameStateEvent(
+                                    Messages.GameStateEvent.Type.END_WIN, playerId, playerId));
+                    return;
                 }
             }
-            currentPlayerId = gameData.getNextPlayerId();
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                if (!running) return;
+            }
+            postLoop:
+            while (true) {
+                Messages.PlayerAction messagePost = actionAfterDiscard();
+                switch (messagePost.type()) {
+                    case CHI -> {
+                        gameData.handleChi(messagePost.id(), messagePost.tile());
+                        podcast(messagePost);
+                    }
+                    case PENG -> {
+                        gameData.handlePeng(messagePost.id());
+                        podcast(messagePost);
+                    }
+                    case GANG -> {
+                        gameData.handleNormalGang(messagePost.id());
+                        podcast(messagePost);
+                        drawTile(false, false, 1, true);
+                    }
+                    case HU -> {
+                        podcast(
+                                new Messages.GameStateEvent(
+                                        Messages.GameStateEvent.Type.END_WIN,
+                                        messagePost.id(),
+                                        gameData.getCurrentPlayerId()));
+                        return;
+                    }
+                    case SKIP -> {
+                        break postLoop;
+                    }
+                }
+                Messages.PlayerAction discardMessage = waitForTileToDiscard();
+                gameData.handleDiscard(discardMessage.tile());
+                podcast(discardMessage);
+            }
+            gameData.nextPlayer();
+            drawTile(false, true, 1, false);
         }
         podcast(
                 new Messages.GameStateEvent(
                         Messages.GameStateEvent.Type.END_DRAW, (byte) -1, (byte) -1));
-        gameData.destruct();
     }
 
-    private void drawTile(byte playerId, boolean inHand, int num) {
-        Tile[] tiles = gameData.getSpareTiles().drawTiles(num);
+    private void drawTile(boolean inHand, boolean inPreState, int num, boolean reverse) {
+        byte playerId = gameData.getCurrentPlayerId();
+        Tile[] tiles = gameData.getSpareTiles().drawTiles(num, false);
         Tile[] wildcardTiles = new Tile[num];
         for (int i = 0; i < num; i++) {
-            gameData.getPlayerTiles()[playerId].tileInHand.add(tiles[i]);
+            gameData.getPlayerData()[playerId].tileInHand.add(tiles[i]);
             wildcardTiles[i] = Tiles.WILDCARD;
         }
-        post(new Messages.PlayerDraw(playerId, inHand, (byte) num, tiles), playerId);
+        byte spareNum = (byte) gameData.getSpareTiles().size();
+        post(new Messages.PlayerDraw(playerId, inHand, inPreState, spareNum, tiles), playerId);
         filteredPodcast(
-                new Messages.PlayerDraw(playerId, inHand, (byte) num, wildcardTiles), playerId);
+                new Messages.PlayerDraw(playerId, inHand, inPreState, spareNum, wildcardTiles),
+                playerId);
+    }
+
+    private void gamePreDraw() {
+        for (int round = 1; round <= 3; round++)
+            for (int i = 0; i < listenerHandler.currentPlayers.get(); i++) {
+                drawTile(true, true, 4, false);
+                gameData.nextPlayer();
+                try {
+                    Thread.sleep(200);
+                } catch (InterruptedException e) {
+                    if (!running) return;
+                }
+            }
+        for (int i = 0; i < listenerHandler.currentPlayers.get(); i++) {
+            drawTile(true, true, 1, false);
+            gameData.nextPlayer();
+            try {
+                Thread.sleep(200);
+            } catch (InterruptedException e) {
+                if (!running) return;
+            }
+        }
+    }
+
+    private Messages.PlayerAction actionBeforeDiscard() {
+        byte currentPlayerId = gameData.getCurrentPlayerId();
+        var currentPlayerData = gameData.getPlayerData()[currentPlayerId];
+        switch (currentPlayerData.getType()) {
+            case FAKE -> {
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    if (!running) return null;
+                }
+                Tile tile = FakePlayerUtil.calculateTileToDiscard(currentPlayerData.tileInHand);
+                return new Messages.PlayerAction(
+                        currentPlayerId, Messages.PlayerAction.Type.DISCARD, tile);
+            }
+            case REMOTE -> {
+                byte tickChance = TICK_COUNT; // 30秒思考时间
+                try {
+                    Messages.PlayerAction message = null;
+                    while (tickChance >= 0) {
+                        post(new Messages.GameTick(tickChance), currentPlayerId);
+                        message = inGameMessage.poll(1, TimeUnit.SECONDS);
+                        tickChance--;
+                        if (message != null) {
+                            switch (message.type()) {
+                                case GANG, DISCARD -> {
+                                    inGameMessage.clear();
+                                    return message;
+                                }
+                            }
+                        }
+                    }
+                } catch (InterruptedException _) {
+                    if (!running) return null;
+                }
+            }
+        }
+        inGameMessage.clear();
+        Tile tile = FakePlayerUtil.calculateTileToDiscard(currentPlayerData.tileInHand);
+        return new Messages.PlayerAction(currentPlayerId, Messages.PlayerAction.Type.DISCARD, tile);
+    }
+
+    private Messages.PlayerAction actionAfterDiscard() {
+        boolean[] actions = new boolean[] {false, false, false, false};
+        int totalNum = 0;
+        byte tickChance = TICK_COUNT;
+        for (int i = 0; i <= 3; i++)
+            if (gameData.getPlayerData()[i].getType() == PlayerType.REMOTE) totalNum++;
+        ArrayList<Messages.PlayerAction> messages = new ArrayList<>(4);
+        while (totalNum > 0 && tickChance >= 0 || !inGameMessage.isEmpty()) {
+            podcast(new Messages.GameTick(TICK_COUNT));
+            try {
+                Messages.PlayerAction message = inGameMessage.poll(1, TimeUnit.SECONDS);
+                if (message != null) {
+                    if (!actions[message.id()]) {
+                        actions[message.id()] = true;
+                        totalNum--;
+                        messages.add(message);
+                    }
+                    continue;
+                }
+            } catch (InterruptedException e) {
+                if (!running)
+                    return new Messages.PlayerAction(
+                            (byte) -1, Messages.PlayerAction.Type.SKIP, Tiles.WILDCARD);
+            }
+            tickChance--;
+        }
+        Collections.sort(messages);
+        if (messages.isEmpty())
+            return new Messages.PlayerAction(
+                    (byte) -1, Messages.PlayerAction.Type.SKIP, Tiles.WILDCARD);
+        else {
+            return messages.getFirst();
+        }
+    }
+
+    private Messages.PlayerAction waitForTileToDiscard() {
+        byte currentPlayerId = gameData.getCurrentPlayerId();
+        var currentPlayerData = gameData.getPlayerData()[currentPlayerId];
+        switch (currentPlayerData.getType()) {
+            case FAKE -> {
+                try {
+                    Thread.sleep(1000);
+                } catch (InterruptedException e) {
+                    if (!running) return null;
+                }
+                Tile tile = FakePlayerUtil.calculateTileToDiscard(currentPlayerData.tileInHand);
+                return new Messages.PlayerAction(
+                        currentPlayerId, Messages.PlayerAction.Type.DISCARD, tile);
+            }
+            case REMOTE -> {
+                byte tickChance = TICK_COUNT; // 30秒思考时间
+                try {
+                    Messages.PlayerAction message = null;
+                    while (tickChance >= 0) {
+                        post(new Messages.GameTick(tickChance), currentPlayerId);
+                        message = inGameMessage.poll(1, TimeUnit.SECONDS);
+                        tickChance--;
+                        if (message != null
+                                && message.type() == Messages.PlayerAction.Type.DISCARD) {
+                            inGameMessage.clear();
+                            return message;
+                        }
+                    }
+                } catch (InterruptedException _) {
+                    if (!running) return null;
+                }
+            }
+        }
+        inGameMessage.clear();
+        Tile tile = FakePlayerUtil.calculateTileToDiscard(currentPlayerData.tileInHand);
+        return new Messages.PlayerAction(currentPlayerId, Messages.PlayerAction.Type.DISCARD, tile);
     }
 
     private synchronized void addPlayer(boolean isAdmin, Socket clientSocket) throws IOException {
@@ -163,9 +298,9 @@ public class MahjongServer implements Runnable {
                 clients[i].connect(clientSocket);
                 players[i].setType(PlayerType.REMOTE);
                 players[i].setAdmin(isAdmin);
-                clients[i].sendMessage(new Messages.ServerInfo((byte) i, players));
+                clients[i].sendMessage(Messages.ServerInfo.of((byte) i, players));
                 podcast(new Messages.PlayerJoin((byte) i, PlayerType.REMOTE));
-                break;
+                return;
             }
     }
 
@@ -210,18 +345,20 @@ public class MahjongServer implements Runnable {
 
         @Override
         public void run() {
+            thread = Thread.currentThread();
             try (serverSocket) {
                 serverSocket.setSoTimeout(100);
                 while (running) {
                     try {
                         int current = currentPlayers.get();
                         if (current >= MAX_PLAYERS) {
+                            thread.sleep(100);
                             continue;
                         }
                         if (listening) {
                             Socket clientSocket = serverSocket.accept();
-                            currentPlayers.incrementAndGet();
-                            addPlayer(currentPlayers.get() == 1, clientSocket);
+                            int num = currentPlayers.incrementAndGet();
+                            addPlayer(num == 1, clientSocket);
                         }
                         Thread.sleep(500);
                     } catch (SocketTimeoutException _) {
@@ -287,27 +424,27 @@ public class MahjongServer implements Runnable {
         public void processMessage(BinaryMessage binaryMessage) {
             switch (binaryMessage.type()) {
                 case PLAYER_LEAVE -> {
-                    Messages.PlayerLeave message_ =
+                    Messages.PlayerLeave message =
                             Messages.PlayerLeave.toMessage(binaryMessage.bytes());
-                    switch (message_.reason()) {
+                    switch (message.reason()) {
                         case KICKED -> {
-                            byte id = message_.id();
+                            byte id = message.id();
                             filteredPodcast(
                                     new Messages.PlayerLeave(
                                             id, Messages.PlayerLeave.Reason.DISCONNECT),
-                                    message_.id());
+                                    message.id());
                             post(
                                     new Messages.PlayerLeave(
                                             id, Messages.PlayerLeave.Reason.KICKED),
-                                    message_.id());
+                                    message.id());
                             clients[id].disconnect();
                             gameData.getPlayerData()[id].setType(PlayerType.EMPTY);
                             listenerHandler.currentPlayers.decrementAndGet();
                         }
                         case DISCONNECT -> {
-                            byte id = message_.id();
+                            byte id = message.id();
                             if (!gameData.getPlayerData()[id].isAdmin()) {
-                                podcast(message_);
+                                podcast(message);
                                 clients[id].disconnect();
                                 gameData.getPlayerData()[id].setType(PlayerType.EMPTY);
                                 listenerHandler.currentPlayers.decrementAndGet();
@@ -317,51 +454,51 @@ public class MahjongServer implements Runnable {
                                                 (byte) -1,
                                                 Messages.PlayerLeave.Reason.SERVER_CLOSE),
                                         id);
-                                post(message_, id);
+                                post(message, id);
                                 MahjongServer.this.shutdown();
                             }
                         }
                     }
                 }
                 case POS_CHANGE -> {
-                    Messages.PosChange message_ =
+                    Messages.PosChange message =
                             Messages.PosChange.toMessage(binaryMessage.bytes());
-                    byte id1 = message_.id1();
-                    byte id2 = message_.id2();
+                    byte id1 = message.fromId();
+                    byte id2 = message.toId();
                     gameData.changePos(id1, id2);
                     clients[id1].setId(id2);
                     clients[id2].setId(id1);
                     Arrays.sort(clients);
-                    podcast(message_);
+                    podcast(message);
                 }
                 case AI_CHANGE -> {
-                    Messages.AIChange message_ = Messages.AIChange.toMessage(binaryMessage.bytes());
-                    switch (message_.type()) {
+                    Messages.AIChange message = Messages.AIChange.toMessage(binaryMessage.bytes());
+                    switch (message.type()) {
                         case SET -> {
-                            gameData.getPlayerData()[message_.id()].setType(PlayerType.FAKE);
+                            gameData.getPlayerData()[message.id()].setType(PlayerType.FAKE);
                             listenerHandler.currentPlayers.incrementAndGet();
                         }
                         case CLEAR -> {
-                            gameData.getPlayerData()[message_.id()].setType(PlayerType.EMPTY);
+                            gameData.getPlayerData()[message.id()].setType(PlayerType.EMPTY);
                             listenerHandler.currentPlayers.decrementAndGet();
                         }
                     }
-                    podcast(message_);
+                    podcast(message);
                 }
                 case GAME_STATE_EVENT -> {
-                    Messages.GameStateEvent message_ =
+                    Messages.GameStateEvent message =
                             Messages.GameStateEvent.toMessage(binaryMessage.bytes());
-                    switch (message_.type()) {
-                        case START -> {
+                    switch (message.type()) {
+                        case GAME_START_PRE -> {
                             start = true;
-                            podcast(message_);
+                            podcast(message);
                         }
                     }
                 }
                 case PLAYER_ACTION -> {
-                    Messages.PlayerAction message_ =
+                    Messages.PlayerAction message =
                             Messages.PlayerAction.toMessage(binaryMessage.bytes());
-                    inGameMessage.offer(message_);
+                    inGameMessage.offer(message);
                 }
             }
         }

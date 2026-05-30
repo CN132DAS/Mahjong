@@ -4,33 +4,38 @@ import com.groupwork.mahjong.common.player.PlayerData;
 import com.groupwork.mahjong.common.player.PlayerType;
 import com.groupwork.mahjong.common.tiles.Tile;
 import com.groupwork.mahjong.common.tiles.Tiles;
+import org.jetbrains.annotations.NotNull;
 
 public class Messages {
-    public record ServerInfo(byte receiveId, PlayerData[] playerData) implements IMessage {
+    public record ServerInfo(byte receiveId, byte adminId, @NotNull PlayerType[] types)
+            implements IMessage {
+        public static ServerInfo of(byte receiveId, PlayerData[] data) {
+            byte adminId = 0;
+            PlayerType[] types = new PlayerType[4];
+            for (int i = 0; i <= 3; i++) {
+                types[i] = data[i].getType();
+                if (data[i].isAdmin()) adminId = (byte) i;
+            }
+            return new ServerInfo(receiveId, adminId, types);
+        }
+
         @Override
         public BinaryMessage toBinaryMessage() {
-            byte[] bytes = new byte[9];
+            byte[] bytes = new byte[6];
             bytes[0] = receiveId;
-            for (int i = 0; i <= 3; i++) {
-                bytes[i * 2 + 1] = (byte) (playerData[i].isAdmin() ? 1 : 0);
-                bytes[i * 2 + 2] = (byte) playerData[i].getType().ordinal();
-            }
+            bytes[1] = adminId;
+            for (int i = 0; i <= 3; i++) bytes[2 + i] = (byte) types[i].ordinal();
             return new BinaryMessage(MessageType.SERVER_INFO, bytes);
         }
 
         public static ServerInfo toMessage(byte[] bytes) {
-            byte[] id = new byte[] {1, 2, 3, 4};
-            PlayerData[] playerData = new PlayerData[4];
-            for (int i = 0; i <= 3; i++) {
-                playerData[i] = new PlayerData();
-                playerData[i].setAdmin(bytes[2 * i + 1] == 1);
-                playerData[i].setType(PlayerType.values()[bytes[2 * i + 2]]);
-            }
-            return new ServerInfo(bytes[0], playerData);
+            PlayerType[] playerData = new PlayerType[4];
+            for (int i = 0; i <= 3; i++) playerData[i] = PlayerType.values()[bytes[2 + i]];
+            return new ServerInfo(bytes[0], bytes[1], playerData);
         }
     }
 
-    public record PlayerJoin(byte id, PlayerType type) implements IMessage {
+    public record PlayerJoin(byte id, @NotNull PlayerType type) implements IMessage {
         @Override
         public BinaryMessage toBinaryMessage() {
             byte[] bytes = new byte[2];
@@ -44,7 +49,7 @@ public class Messages {
         }
     }
 
-    public record PlayerLeave(byte id, Reason reason) implements IMessage {
+    public record PlayerLeave(byte id, @NotNull Reason reason) implements IMessage {
         public enum Reason {
             DISCONNECT,
             KICKED,
@@ -62,10 +67,10 @@ public class Messages {
         }
     }
 
-    public record PosChange(byte id1, byte id2) implements IMessage {
+    public record PosChange(byte fromId, byte toId) implements IMessage {
         @Override
         public BinaryMessage toBinaryMessage() {
-            return new BinaryMessage(MessageType.POS_CHANGE, new byte[] {id1, id2});
+            return new BinaryMessage(MessageType.POS_CHANGE, new byte[] {fromId, toId});
         }
 
         public static PosChange toMessage(byte[] bytes) {
@@ -73,7 +78,7 @@ public class Messages {
         }
     }
 
-    public record AIChange(byte id, Type type) implements IMessage {
+    public record AIChange(byte id, @NotNull Type type) implements IMessage {
         public enum Type {
             SET,
             CLEAR;
@@ -90,12 +95,14 @@ public class Messages {
         }
     }
 
-    public record GameStateEvent(Type type, byte id1, byte id2) implements IMessage {
+    public record GameStateEvent(@NotNull Type type, byte id1, byte id2) implements IMessage {
         public enum Type {
-            START,
+            GAME_START_PRE,
+            GAME_START,
+            //            STAGE_PRE,          //最开始抓牌后的阶段,允许:出牌、暗杠、加杠、自摸
+            //            STAGE_POST,         //当有人打出过牌后的阶段,允许:跳过、出牌、吃、碰、明杠、和
             END_DRAW,
-            END_WIN_SELF,
-            END_WIN_OTHER;
+            END_WIN;
         }
 
         @Override
@@ -109,78 +116,80 @@ public class Messages {
         }
     }
 
-    public record PlayerDraw(byte id, boolean inHand, byte num, Tile[] tiles) implements IMessage {
+    public record PlayerDraw(
+            byte id, boolean inHand, boolean inPreState, byte spareNum, @NotNull Tile[] tiles)
+            implements IMessage {
         @Override
         public BinaryMessage toBinaryMessage() {
-            byte[] bytes = new byte[3 + num];
+            int num = tiles.length;
+            byte[] bytes = new byte[4 + num];
             bytes[0] = id;
-            bytes[1] = inHand ? (byte) 1 : (byte) 0;
-            bytes[2] = num;
-            for (int i = 0; i < num; i++) bytes[3 + i] = tiles[i].getID();
+            bytes[1] = (byte) (inHand ? 1 : 0);
+            bytes[2] = (byte) (inPreState ? 1 : 0);
+            bytes[3] = spareNum;
+            for (int i = 0; i < num; i++) bytes[4 + i] = tiles[i].getID();
             return new BinaryMessage(MessageType.PLAYER_DRAW, bytes);
         }
 
         public static PlayerDraw toMessage(byte[] bytes) {
+            int num = bytes.length - 4;
             byte id = bytes[0];
             boolean inHand = bytes[1] == 1;
-            byte num = bytes[2];
+            boolean inPreState = bytes[2] == 1;
+            byte spareNum = bytes[3];
             Tile[] tiles = new Tile[num];
-            for (int i = 0; i < num; i++) tiles[i] = Tiles.getTile(bytes[3 + i]);
-            return new PlayerDraw(id, inHand, num, tiles);
+            for (int i = 0; i < num; i++) tiles[i] = Tiles.getTile(bytes[4 + i]);
+            return new PlayerDraw(id, inHand, inPreState, spareNum, tiles);
         }
     }
 
-    public record PLayerTurn(byte id) implements IMessage {
+    public record PlayerAction(byte id, @NotNull Type type, @NotNull Tile tile)
+            implements IMessage, Comparable<PlayerAction> {
         @Override
-        public BinaryMessage toBinaryMessage() {
-            return new BinaryMessage(MessageType.PLAYER_TURN, new byte[] {id});
+        public int compareTo(PlayerAction o) {
+            final int i = type.ordinal() - o.type.ordinal();
+            return switch (type) {
+                case PENG -> o.type == Type.GANG ? 0 : i;
+                case GANG -> o.type == Type.PENG ? 0 : i;
+                default -> i;
+            };
         }
 
-        public static PLayerTurn toMessage(byte[] bytes) {
-            return new PLayerTurn(bytes[0]);
-        }
-    }
-
-    public record PlayerAction(byte id, Type type, byte num, Tile[] tiles) implements IMessage {
         public enum Type {
-            DISCARD,
-            CHI,
-            PENG,
-            MING_GANG,
-            AN_GANG,
-            JIA_GANG,
             HU,
+            PENG,
+            GANG,
+            CHI,
+            DISCARD,
             SKIP
         }
 
         @Override
         public BinaryMessage toBinaryMessage() {
-            byte[] bytes = new byte[3 + num];
+            byte[] bytes = new byte[3];
             bytes[0] = id;
             bytes[1] = (byte) type.ordinal();
-            bytes[2] = num;
-            for (int i = 0; i < num; i++) bytes[3 + i] = tiles[i].getID();
+            bytes[2] = tile.getID();
             return new BinaryMessage(MessageType.PLAYER_ACTION, bytes);
         }
 
         public static PlayerAction toMessage(byte[] bytes) {
+            int num = bytes.length - 2;
             byte id = bytes[0];
             Type type = Type.values()[bytes[1]];
-            byte num = bytes[2];
-            Tile[] tiles = new Tile[num];
-            for (int i = 0; i < num; i++) tiles[i] = Tiles.getTile(bytes[3 + i]);
-            return new PlayerAction(id, type, num, tiles);
+            Tile tile = Tiles.getTile(bytes[2]);
+            return new PlayerAction(id, type, tile);
         }
     }
 
-    public record WaitingForChoice(Type type) {
-        public enum Type {
-            CHI,
-            PENG,
-            MING_GANG,
-            AN_GANG,
-            JIA_GANG,
-            HU,
+    public record GameTick(byte tickCount) implements IMessage {
+        @Override
+        public BinaryMessage toBinaryMessage() {
+            return new BinaryMessage(MessageType.GAME_TICK, new byte[] {tickCount});
+        }
+
+        public static GameTick toMessage(byte[] bytes) {
+            return new GameTick(bytes[0]);
         }
     }
 }

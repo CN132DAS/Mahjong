@@ -8,7 +8,7 @@ public enum MessageType {
     AI_CHANGE,
     GAME_STATE_EVENT,
     PLAYER_DRAW,
-    PLAYER_TURN,
     PLAYER_ACTION,
+    GAME_TICK,
     WAITING_FOR_CHOICE;
 }

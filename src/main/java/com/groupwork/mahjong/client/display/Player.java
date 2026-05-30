@@ -1,6 +1,6 @@
 package com.groupwork.mahjong.client.display;
 
-import com.groupwork.mahjong.Mahjong;
+import com.groupwork.mahjong.MahjongClient;
 import com.groupwork.mahjong.common.message.Messages;
 import com.groupwork.mahjong.common.player.PlayerData;
 import java.util.ArrayList;
@@ -34,7 +34,9 @@ public class Player {
             result.setSpacing(20);
             result.getChildren().addAll(tilesShown);
             result.getChildren()
-                    .add(TileImage.getGroupDisplay(data.tileInHand, rotation, interactive));
+                    .add(
+                            TileImage.getGroupDisplay(
+                                    data.tileInHand, rotation, interactive, data.tileDraw));
             if (data.tileDraw != null) {
                 result.getChildren().add(new TileImage(data.tileDraw, rotation, interactive));
             }
@@ -49,7 +51,9 @@ public class Player {
             result.setSpacing(20);
             result.getChildren().addAll(tilesShown);
             result.getChildren()
-                    .add(TileImage.getGroupDisplay(data.tileInHand, rotation, interactive));
+                    .add(
+                            TileImage.getGroupDisplay(
+                                    data.tileInHand, rotation, interactive, data.tileDraw));
             if (data.tileDraw != null) {
                 result.getChildren().add(new TileImage(data.tileDraw, rotation, interactive));
             }
@@ -123,7 +127,7 @@ public class Player {
             HBox.setHgrow(spacing, Priority.ALWAYS);
 
             HBox hBox = getDescriptionOutline();
-            if (Mahjong.getInstance().getClient().isAdmin()) {
+            if (MahjongClient.getInstance().getGameData().isAdmin()) {
                 Button kick = Util.buttonWithFont("踢出", 20);
                 kick.addEventHandler(MouseEvent.MOUSE_CLICKED, Logic.kick(id));
 
@@ -141,7 +145,7 @@ public class Player {
             HBox.setHgrow(spacing, Priority.ALWAYS);
 
             HBox hBox = getDescriptionOutline();
-            if (Mahjong.getInstance().getClient().isAdmin()) {
+            if (MahjongClient.getInstance().getGameData().isAdmin()) {
                 Button clearAI = Util.buttonWithFont("清除", 20);
                 clearAI.addEventHandler(
                         MouseEvent.MOUSE_CLICKED,
@@ -164,7 +168,7 @@ public class Player {
             changePos.addEventHandler(MouseEvent.MOUSE_CLICKED, Logic.changePos(id));
 
             HBox hBox = getDescriptionOutline();
-            if (Mahjong.getInstance().getClient().isAdmin()) {
+            if (MahjongClient.getInstance().getGameData().isAdmin()) {
                 Button setAI = Util.buttonWithFont("设为AI", 20);
                 setAI.addEventHandler(
                         MouseEvent.MOUSE_CLICKED, Logic.aiRelevant(id, Messages.AIChange.Type.SET));

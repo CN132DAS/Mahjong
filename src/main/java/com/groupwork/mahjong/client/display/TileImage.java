@@ -2,7 +2,9 @@ package com.groupwork.mahjong.client.display;
 
 import com.groupwork.mahjong.common.tiles.Tile;
 import com.groupwork.mahjong.common.tiles.TileGroup;
+import com.groupwork.mahjong.common.tiles.Tiles;
 import java.util.ArrayList;
+import java.util.List;
 import javafx.scene.Group;
 import javafx.scene.image.Image;
 import javafx.scene.image.ImageView;
@@ -43,22 +45,33 @@ public class TileImage extends Group implements Comparable<TileImage> {
     }
 
     public static Pane getGroupDisplay(
-            TileGroup group, Util.Rotation rotation, boolean interactive) {
+            TileGroup group, Util.Rotation rotation, boolean interactive, Tile tilesDrawn) {
+        List<TileImage> tiles;
+        if (tilesDrawn != null) {
+            tiles = new ArrayList<>();
+            boolean flag = false;
+            for (var tile : group) {
+                if (tile == tilesDrawn && !flag) {
+                    flag = true;
+                    continue;
+                }
+                tiles.add(new TileImage(tile, rotation, interactive));
+            }
+        } else if (group.isAnGang()) {
+            tiles = new ArrayList<>();
+            tiles.add(new TileImage(Tiles.WILDCARD, rotation, interactive));
+            tiles.add(new TileImage(group.getFirst(), rotation, interactive));
+            tiles.add(new TileImage(group.getFirst(), rotation, interactive));
+            tiles.add(new TileImage(Tiles.WILDCARD, rotation, interactive));
+        } else
+            tiles = group.stream().map(tile -> new TileImage(tile, rotation, interactive)).toList();
         if (rotation == Util.Rotation.NO_ROTATION || rotation == Util.Rotation.REVERSE_180) {
             HBox result = new HBox();
-            result.getChildren()
-                    .addAll(
-                            group.stream()
-                                    .map(tile -> new TileImage(tile, rotation, interactive))
-                                    .toList());
+            result.getChildren().addAll(tiles);
             return result;
         } else {
             VBox result = new VBox();
-            result.getChildren()
-                    .addAll(
-                            group.stream()
-                                    .map(tile -> new TileImage(tile, rotation, interactive))
-                                    .toList());
+            result.getChildren().addAll(tiles);
             return result;
         }
     }
@@ -67,7 +80,7 @@ public class TileImage extends Group implements Comparable<TileImage> {
             ArrayList<TileGroup> tileShown, Util.Rotation rotation) {
         ArrayList<Pane> result = new ArrayList<>();
         for (var group : tileShown) {
-            result.add(getGroupDisplay(group, rotation, false));
+            result.add(getGroupDisplay(group, rotation, false, null));
         }
         return result;
     }

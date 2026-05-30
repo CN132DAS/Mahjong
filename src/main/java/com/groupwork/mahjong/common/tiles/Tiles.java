@@ -7,7 +7,7 @@ public class Tiles {
     public static final Tile WILDCARD = new Tile(TileType.UNKNOWN, (byte) 0);
     private static final ArrayList<Tile> holder = new ArrayList<>(35);
 
-    public static void init() {
+    static {
         holder.add(WILDCARD);
         for (var kind : TileType.values()) {
             for (int i = 1; i <= kind.maxKind; i++) holder.add(new Tile(kind, (byte) i));
@@ -15,6 +15,7 @@ public class Tiles {
     }
 
     public static Tile getTile(byte id) {
+        if (id < 0 || id > 34) return WILDCARD;
         return holder.get(id);
     }
 

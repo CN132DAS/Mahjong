@@ -7,6 +7,15 @@ import java.util.ArrayList;
 public class PlayerData {
     private boolean isAdmin = false;
     private PlayerType type = PlayerType.EMPTY;
+    public ArrayList<TileGroup> tileShown = new ArrayList<>();
+    public TileGroup tileInHand = new TileGroup(false);
+    public ArrayList<Tile> tileDiscarded = new ArrayList<>();
+
+    public void clearTileData() {
+        tileShown.clear();
+        tileInHand.clear();
+        tileDiscarded.clear();
+    }
 
     public String getDescriptionString(byte id) {
         if (type == PlayerType.EMPTY) return "空闲";
@@ -20,14 +29,6 @@ public class PlayerData {
         }
     }
 
-    public PlayerType getType() {
-        return type;
-    }
-
-    public void setType(PlayerType type) {
-        this.type = type;
-    }
-
     public boolean isAdmin() {
         return isAdmin;
     }
@@ -36,38 +37,30 @@ public class PlayerData {
         this.isAdmin = isAdmin;
     }
 
-    public static class ServerSpec {
-        public ArrayList<TileGroup> tileShown;
-        public TileGroup tileInHand;
-        public TileGroup tileDiscarded;
-
-        public ServerSpec(
-                ArrayList<TileGroup> tileShown, TileGroup tileInHand, TileGroup tileDiscarded) {
-            this.tileShown = tileShown;
-            this.tileInHand = tileInHand;
-            this.tileDiscarded = tileDiscarded;
-        }
-
-        public static ServerSpec defaultInstance() {
-            return new ServerSpec(new ArrayList<>(), new TileGroup(true), new TileGroup(false));
-        }
+    public PlayerType getType() {
+        return type;
     }
 
-    public static class ClientSpec {
-        public ArrayList<TileGroup> tileShown;
-        public TileGroup tileInHand;
+    public void setType(PlayerType type) {
+        this.type = type;
+    }
+
+    public void swap(PlayerData other) {
+        boolean tmpAdmin = this.isAdmin;
+        this.isAdmin = other.isAdmin;
+        other.isAdmin = tmpAdmin;
+        PlayerType tmpType = this.type;
+        this.type = other.type;
+        other.type = tmpType;
+    }
+
+    public static class ClientSpec extends PlayerData {
         public Tile tileDraw = null;
-        public TileGroup tileDiscarded;
 
-        public ClientSpec(
-                ArrayList<TileGroup> tileShown, TileGroup tileInHand, TileGroup tileDiscarded) {
-            this.tileShown = tileShown;
-            this.tileInHand = tileInHand;
-            this.tileDiscarded = tileDiscarded;
-        }
-
-        public static ClientSpec defaultInstance() {
-            return new ClientSpec(new ArrayList<>(), new TileGroup(true), new TileGroup(false));
+        @Override
+        public void clearTileData() {
+            super.clearTileData();
+            this.tileDraw = null;
         }
     }
 }
