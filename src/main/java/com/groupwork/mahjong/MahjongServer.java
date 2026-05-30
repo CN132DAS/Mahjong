@@ -201,7 +201,7 @@ public class MahjongServer implements Runnable {
                         tickChance--;
                         if (message != null) {
                             switch (message.type()) {
-                                case GANG, DISCARD -> {
+                                case GANG, DISCARD, HU -> {
                                     inGameMessage.clear();
                                     return message;
                                 }

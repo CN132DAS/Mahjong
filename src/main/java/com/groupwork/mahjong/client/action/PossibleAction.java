@@ -30,7 +30,8 @@ public record PossibleAction(List<IAction> actions) {
         if (canPeng(data.tileInHand, discardedTile))
             actions.add(IAction.Peng(new Tile[] {discardedTile}));
         TileGroup obj = new TileGroup(false);
-        obj.addAll(getChiCombinations(data.tileInHand, discardedTile));
+        if (canChi && discardedTile.hasChiCombinations())
+            obj.addAll(getChiCombinations(data.tileInHand, discardedTile));
         if (!obj.isEmpty()) actions.add(IAction.Chi(obj.toArray(new Tile[0])));
         if (canHu(data, discardedTile)) {
             actions.add(IAction.HU);
@@ -89,18 +90,16 @@ public record PossibleAction(List<IAction> actions) {
 
     private static List<Tile> getChiCombinations(List<Tile> tileInHand, Tile discardedTile) {
         List<Tile> valid = new ArrayList<>();
-        if (!discardedTile.hasChiCombinations()) {
-            var allCombination = discardedTile.getAllChiCombinations();
-            for (var combination : allCombination) {
-                boolean flag = true;
-                for (var tile : combination) {
-                    if (tile != discardedTile && !tileInHand.contains(tile)) {
-                        flag = false;
-                        break;
-                    }
+        var allCombination = discardedTile.getAllChiCombinations();
+        for (var combination : allCombination) {
+            boolean flag = true;
+            for (var tile : combination) {
+                if (tile != discardedTile && !tileInHand.contains(tile)) {
+                    flag = false;
+                    break;
                 }
-                if (flag) valid.add(combination[0]);
             }
+            if (flag) valid.add(combination[0]);
         }
         return valid;
     }
