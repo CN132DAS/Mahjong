@@ -36,7 +36,7 @@ public class Communicator implements Runnable {
                 try {
                     BinaryMessage binaryMessage = BinaryMessage.staticRead(in);
                     binaryMessageReceived.offer(binaryMessage);
-                } catch (SocketTimeoutException _) {
+                } catch (SocketTimeoutException ignored) {
                 }
                 BinaryMessage binaryMessage = binaryMessageToSend.poll(50, TimeUnit.MILLISECONDS);
                 if (binaryMessage != null) BinaryMessage.write(out, binaryMessage);
@@ -52,11 +52,11 @@ public class Communicator implements Runnable {
         running = false;
         try {
             thread.join(1000);
-        } catch (InterruptedException _) {
+        } catch (InterruptedException ignored) {
         }
         try {
             socket.close();
-        } catch (IOException _) {
+        } catch (IOException ignored) {
         }
     }
 

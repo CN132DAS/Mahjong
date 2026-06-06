@@ -49,9 +49,9 @@ public class MahjongClient {
             new Thread(messageHandler, "client-messageHandler-thread").start();
         } catch (ConnectException e) {
             return -1;
-        } catch (SocketTimeoutException _) {
+        } catch (SocketTimeoutException ignored) {
             return -2;
-        } catch (IOException _) {
+        } catch (IOException ignored) {
             return -3;
         }
         gameData = new GameData.Client();

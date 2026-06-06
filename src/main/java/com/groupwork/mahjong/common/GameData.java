@@ -50,7 +50,7 @@ public abstract class GameData {
 
     public void handleNormalGang(byte playerId) {
         Tile tile = playerData[currentPlayerId].tileDiscarded.removeLast();
-        for (int i = 0; i <= 3; i++) playerData[playerId].tileInHand.remove(tile);
+        for (int i = 0; i < 3; i++) playerData[playerId].tileInHand.remove(tile);
         playerData[playerId].tileShown.add(new TileGroup(List.of(tile, tile, tile, tile), false));
         currentPlayerId = playerId;
     }
@@ -137,14 +137,12 @@ public abstract class GameData {
         @Override
         public void handleAnGang(Tile tile) {
             super.handleAnGang(tile);
-            playerData[currentPlayerId].tileInHand = null;
             Mahjong.getInstance().refresh();
         }
 
         @Override
         public boolean handleJiaGang(Tile tile) {
             if (super.handleJiaGang(tile)) {
-                playerData[currentPlayerId].tileInHand = null;
                 Mahjong.getInstance().refresh();
                 return true;
             }

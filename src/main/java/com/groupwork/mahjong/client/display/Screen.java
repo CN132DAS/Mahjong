@@ -86,7 +86,7 @@ public class Screen {
             VBox.setVgrow(spacing3, Priority.ALWAYS);
 
             content.getChildren().addAll(spacing3, ipDisplay);
-        } catch (UnknownHostException _) {
+        } catch (UnknownHostException ignored) {
         }
         return content;
     }

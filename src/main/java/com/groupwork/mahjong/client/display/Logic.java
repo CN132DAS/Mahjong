@@ -27,11 +27,11 @@ public class Logic {
         }
         while (true) {
             int result =
-                    MahjongClient.getInstance().connect(InetAddress.ofLiteral("127.0.0.1"), true);
+                    MahjongClient.getInstance().connect(InetAddress.getLoopbackAddress(), true);
             if (result == 0) break;
             try {
                 Thread.sleep(200);
-            } catch (InterruptedException _) {
+            } catch (InterruptedException ignored) {
             }
         }
     }
@@ -46,9 +46,9 @@ public class Logic {
             Optional<String> result = dialog.showAndWait();
             if (result.isPresent()) {
                 try {
-                    address = InetAddress.ofLiteral(result.get());
+                    address = InetAddress.getByName(result.get());
                     break;
-                } catch (IllegalArgumentException _) {
+                } catch (IOException ignored) {
                     Util.showAlert(Alert.AlertType.ERROR, "错误", null, "IP地址无效!");
                 }
             } else return;

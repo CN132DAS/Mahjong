@@ -53,7 +53,7 @@ public class MahjongServer implements Runnable {
             while (!start)
                 try {
                     Thread.sleep(400);
-                } catch (InterruptedException _) {
+                } catch (InterruptedException ignored) {
                     if (!running) break;
                 }
             if (!running) break;
@@ -208,7 +208,7 @@ public class MahjongServer implements Runnable {
                             }
                         }
                     }
-                } catch (InterruptedException _) {
+                } catch (InterruptedException ignored) {
                     if (!running) return null;
                 }
             }
@@ -281,7 +281,7 @@ public class MahjongServer implements Runnable {
                             return message;
                         }
                     }
-                } catch (InterruptedException _) {
+                } catch (InterruptedException ignored) {
                     if (!running) return null;
                 }
             }
@@ -361,12 +361,12 @@ public class MahjongServer implements Runnable {
                             addPlayer(num == 1, clientSocket);
                         }
                         Thread.sleep(500);
-                    } catch (SocketTimeoutException _) {
+                    } catch (SocketTimeoutException ignored) {
                     } catch (InterruptedException e) {
                         break;
                     }
                 }
-            } catch (IOException _) {
+            } catch (IOException ignored) {
             }
         }
 
