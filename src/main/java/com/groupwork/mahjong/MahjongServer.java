@@ -9,6 +9,7 @@ import com.groupwork.mahjong.common.player.FakePlayerUtil;
 import com.groupwork.mahjong.common.player.PlayerType;
 import com.groupwork.mahjong.common.tiles.Tile;
 import com.groupwork.mahjong.common.tiles.Tiles;
+import com.groupwork.mahjong.common.util.HuUtil;
 import java.io.*;
 import java.net.ServerSocket;
 import java.net.Socket;
@@ -187,7 +188,10 @@ public class MahjongServer implements Runnable {
                 } catch (InterruptedException e) {
                     if (!running) return null;
                 }
-                Tile tile = FakePlayerUtil.calculateTileToDiscard(currentPlayerData.tileInHand);
+                if (HuUtil.canHu(currentPlayerData))
+                    return new Messages.PlayerAction(
+                            currentPlayerId, Messages.PlayerAction.Type.HU, Tiles.WILDCARD);
+                Tile tile = FakePlayerUtil.calculateTileToDiscard(currentPlayerData);
                 return new Messages.PlayerAction(
                         currentPlayerId, Messages.PlayerAction.Type.DISCARD, tile);
             }
@@ -214,7 +218,7 @@ public class MahjongServer implements Runnable {
             }
         }
         inGameMessage.clear();
-        Tile tile = FakePlayerUtil.calculateTileToDiscard(currentPlayerData.tileInHand);
+        Tile tile = FakePlayerUtil.calculateTileToDiscard(currentPlayerData);
         return new Messages.PlayerAction(currentPlayerId, Messages.PlayerAction.Type.DISCARD, tile);
     }
 
@@ -222,9 +226,20 @@ public class MahjongServer implements Runnable {
         boolean[] actions = new boolean[] {false, false, false, false};
         int totalNum = 0;
         byte tickChance = TICK_COUNT;
-        for (int i = 0; i <= 3; i++)
-            if (gameData.getPlayerData()[i].getType() == PlayerType.REMOTE) totalNum++;
+        byte currentPlayerId = gameData.getCurrentPlayerId();
+        Tile discardedTile = gameData.getPlayerData()[currentPlayerId].tileDiscarded.getLast();
         ArrayList<Messages.PlayerAction> messages = new ArrayList<>(4);
+        for (int i = 0; i <= 3; i++) {
+            if (i == currentPlayerId) continue;
+            var playerData = gameData.getPlayerData()[i];
+            if (playerData.getType() == PlayerType.REMOTE) totalNum++;
+            else if (playerData.getType() == PlayerType.FAKE
+                    && FakePlayerUtil.canHuWithDiscard(playerData, discardedTile)) {
+                messages.add(
+                        new Messages.PlayerAction(
+                                (byte) i, Messages.PlayerAction.Type.HU, discardedTile));
+            }
+        }
         while (totalNum > 0 && tickChance >= 0 || !inGameMessage.isEmpty()) {
             podcast(new Messages.GameTick(TICK_COUNT));
             try {
@@ -263,7 +278,10 @@ public class MahjongServer implements Runnable {
                 } catch (InterruptedException e) {
                     if (!running) return null;
                 }
-                Tile tile = FakePlayerUtil.calculateTileToDiscard(currentPlayerData.tileInHand);
+                if (HuUtil.canHu(currentPlayerData))
+                    return new Messages.PlayerAction(
+                            currentPlayerId, Messages.PlayerAction.Type.HU, Tiles.WILDCARD);
+                Tile tile = FakePlayerUtil.calculateTileToDiscard(currentPlayerData);
                 return new Messages.PlayerAction(
                         currentPlayerId, Messages.PlayerAction.Type.DISCARD, tile);
             }
@@ -287,7 +305,7 @@ public class MahjongServer implements Runnable {
             }
         }
         inGameMessage.clear();
-        Tile tile = FakePlayerUtil.calculateTileToDiscard(currentPlayerData.tileInHand);
+        Tile tile = FakePlayerUtil.calculateTileToDiscard(currentPlayerData);
         return new Messages.PlayerAction(currentPlayerId, Messages.PlayerAction.Type.DISCARD, tile);
     }
 
