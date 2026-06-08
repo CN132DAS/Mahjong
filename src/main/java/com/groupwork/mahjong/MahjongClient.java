@@ -233,20 +233,21 @@ public class MahjongClient {
                             gameData.setBeforeDiscard(false);
                             if (gameData.getCurrentPlayerId() == gameData.getLocalId())
                                 gameData.setPossibleAction(null);
-                            else
+                            else {
                                 gameData.setPossibleAction(
                                         PossibleAction.afterDiscard(
                                                 gameData.getLocalPlayerData(),
                                                 message.tile(),
                                                 gameData.canChi(),
                                                 gameData.getSpareNum()));
-                            if (gameData.getPossibleAction() == null)
-                                sendLocalMessage(
-                                        id ->
-                                                new Messages.PlayerAction(
-                                                        (byte) id,
-                                                        Messages.PlayerAction.Type.SKIP,
-                                                        Tiles.WILDCARD));
+                                if (gameData.getPossibleAction() == null)
+                                    sendLocalMessage(
+                                            id ->
+                                                    new Messages.PlayerAction(
+                                                            (byte) id,
+                                                            Messages.PlayerAction.Type.SKIP,
+                                                            Tiles.WILDCARD));
+                            }
                             Mahjong.refresh();
                         }
                         case GANG -> {

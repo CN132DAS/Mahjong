@@ -1,7 +1,6 @@
 package com.groupwork.mahjong.common.player;
 
 import com.groupwork.mahjong.common.tiles.Tile;
-import com.groupwork.mahjong.common.tiles.TileGroup;
 import com.groupwork.mahjong.common.util.HuUtil;
 import com.groupwork.mahjong.common.util.ShantenUtil;
 import java.util.ArrayList;
@@ -38,9 +37,5 @@ public class FakePlayerUtil {
             }
         }
         return bestTiles.get(randomSource.nextInt(0, bestTiles.size()));
-    }
-
-    public static Tile calculateTileToDiscard(TileGroup group) {
-        return group.get(randomSource.nextInt(0, group.size()));
     }
 }

@@ -179,6 +179,7 @@ public abstract class GameData {
             playerData[message.adminId()].setAdmin(true);
             for (int i = 0; i <= 3; i++) playerData[i].setType(message.types()[i]);
             localId = message.receiveId();
+            playerData[localId].setType(PlayerType.LOCAL);
         }
 
         public PlayerData.ClientSpec getLocalPlayerData() {

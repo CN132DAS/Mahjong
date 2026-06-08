@@ -241,7 +241,7 @@ public class MahjongServer implements Runnable {
             }
         }
         while (totalNum > 0 && tickChance >= 0 || !inGameMessage.isEmpty()) {
-            podcast(new Messages.GameTick(TICK_COUNT));
+            podcast(new Messages.GameTick(tickChance));
             try {
                 Messages.PlayerAction message = inGameMessage.poll(1, TimeUnit.SECONDS);
                 if (message != null) {

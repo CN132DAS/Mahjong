@@ -30,7 +30,7 @@ public record BinaryMessage(MessageType type, byte[] bytes) {
         byte[] information = null;
         if (size > 0) {
             information = new byte[size];
-            in.read(information);
+            in.readFully(information);
         }
         BinaryMessage binaryMessage = new BinaryMessage(type, information);
         if (Mahjong.TEST_MODE)
