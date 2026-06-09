@@ -4,6 +4,7 @@ import com.groupwork.mahjong.common.player.PlayerData;
 import com.groupwork.mahjong.common.tiles.Tile;
 import com.groupwork.mahjong.common.tiles.TileGroup;
 import com.groupwork.mahjong.common.tiles.TileType;
+import com.groupwork.mahjong.common.tiles.Tiles;
 
 public class ShantenUtil {
     private static final int TILE_KIND_COUNT = 35;
@@ -131,10 +132,6 @@ public class ShantenUtil {
     }
 
     private static Tile tileOf(int tileId) {
-        if (tileId <= 9) return new Tile(TileType.CHARACTER, (byte) tileId);
-        if (tileId <= 18) return new Tile(TileType.BAMBOO, (byte) (tileId - 9));
-        if (tileId <= 27) return new Tile(TileType.CIRCLE, (byte) (tileId - 18));
-        if (tileId <= 31) return new Tile(TileType.WIND, (byte) (tileId - 27));
-        return new Tile(TileType.DRAGON, (byte) (tileId - 31));
+        return Tiles.getTile((byte) tileId);
     }
 }

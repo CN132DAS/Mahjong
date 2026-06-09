@@ -12,10 +12,7 @@ import com.groupwork.mahjong.common.network.Communicator;
 import com.groupwork.mahjong.common.player.PlayerType;
 import com.groupwork.mahjong.common.tiles.Tiles;
 import java.io.IOException;
-import java.net.ConnectException;
-import java.net.InetAddress;
-import java.net.Socket;
-import java.net.SocketTimeoutException;
+import java.net.*;
 import java.util.Arrays;
 import java.util.function.IntFunction;
 import javafx.application.Platform;
@@ -41,7 +38,7 @@ public class MahjongClient {
         return gameData;
     }
 
-    public int connect(InetAddress address, boolean isAdmin) {
+    public int connect(InetAddress address) {
         try {
             Socket server = new Socket(address, MahjongServer.PORT);
             communicator = new Communicator(server, messageHandler.receivedMessage);
@@ -54,7 +51,10 @@ public class MahjongClient {
         } catch (IOException ignored) {
             return -3;
         }
-        gameData = new GameData.Client();
+        if(address.equals(InetAddress.getLoopbackAddress()))
+            gameData = new GameData.Client(Mahjong.localIP);
+        else
+            gameData = new GameData.Client(address.getHostAddress());
         return 0;
     }
 
@@ -278,7 +278,6 @@ public class MahjongClient {
                     Mahjong.refresh();
                 }
             }
-            ;
         }
     }
 }

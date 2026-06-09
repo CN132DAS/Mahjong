@@ -108,6 +108,7 @@ public abstract class GameData {
 
     public static class Client extends GameData {
         private final PlayerData.ClientSpec[] playerData = new PlayerData.ClientSpec[4];
+        public final String serverAddress;
         private PossibleAction possibleAction;
         private boolean start;
         private boolean beforeDiscard;
@@ -120,6 +121,10 @@ public abstract class GameData {
                 playerData[i] = new PlayerData.ClientSpec();
                 super.playerData[i] = playerData[i];
             }
+        }
+
+        public Client(String serverAddress) {
+            this.serverAddress = serverAddress;
         }
 
         @Override
@@ -137,13 +142,13 @@ public abstract class GameData {
         @Override
         public void handleAnGang(Tile tile) {
             super.handleAnGang(tile);
-            Mahjong.getInstance().refresh();
+            Mahjong.refresh();
         }
 
         @Override
         public boolean handleJiaGang(Tile tile) {
             if (super.handleJiaGang(tile)) {
-                Mahjong.getInstance().refresh();
+                Mahjong.refresh();
                 return true;
             }
             return false;

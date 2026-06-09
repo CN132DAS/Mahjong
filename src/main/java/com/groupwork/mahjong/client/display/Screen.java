@@ -2,8 +2,6 @@ package com.groupwork.mahjong.client.display;
 
 import com.groupwork.mahjong.MahjongClient;
 import com.groupwork.mahjong.common.GameData;
-import java.net.InetAddress;
-import java.net.UnknownHostException;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.scene.Parent;
@@ -64,30 +62,29 @@ public class Screen {
         content.setAlignment(Pos.CENTER);
         content.setSpacing(20);
 
-        try {
-            HBox ipDisplay = new HBox();
-            ipDisplay.setAlignment(Pos.CENTER);
-            ipDisplay.setPadding(new Insets(10, 10, 10, 10));
+        HBox ipDisplay = new HBox();
+        ipDisplay.setAlignment(Pos.CENTER);
+        ipDisplay.setPadding(new Insets(10, 10, 10, 10));
 
-            Text ip = Util.textWithFont("ip:" + InetAddress.getLocalHost().getHostAddress(), 30);
+        Text ip =
+                Util.textWithFont(
+                        "ip:" + MahjongClient.getInstance().getGameData().serverAddress, 30);
 
-            Region spacing2 = new Region();
-            HBox.setHgrow(spacing2, Priority.ALWAYS);
-            if (MahjongClient.getInstance().getGameData().isAdmin()) {
-                Button start = Util.buttonWithFont("开始游戏", 30);
-                start.addEventHandler(MouseEvent.MOUSE_CLICKED, Logic::start);
+        Region spacing2 = new Region();
+        HBox.setHgrow(spacing2, Priority.ALWAYS);
+        if (MahjongClient.getInstance().getGameData().isAdmin()) {
+            Button start = Util.buttonWithFont("开始游戏", 30);
+            start.addEventHandler(MouseEvent.MOUSE_CLICKED, Logic::start);
 
-                ipDisplay.getChildren().addAll(ip, spacing2, start);
-            } else {
-                ipDisplay.getChildren().addAll(ip, spacing2);
-            }
-
-            Region spacing3 = new Region();
-            VBox.setVgrow(spacing3, Priority.ALWAYS);
-
-            content.getChildren().addAll(spacing3, ipDisplay);
-        } catch (UnknownHostException ignored) {
+            ipDisplay.getChildren().addAll(ip, spacing2, start);
+        } else {
+            ipDisplay.getChildren().addAll(ip, spacing2);
         }
+
+        Region spacing3 = new Region();
+        VBox.setVgrow(spacing3, Priority.ALWAYS);
+
+        content.getChildren().addAll(spacing3, ipDisplay);
         return content;
     }
 

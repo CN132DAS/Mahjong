@@ -8,12 +8,26 @@ import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.stage.Stage;
 
+import java.net.InetAddress;
+import java.net.UnknownHostException;
+
 public class Mahjong extends Application {
+    public static final String localIP;
     public static final boolean TEST_MODE = false;
     private static Mahjong instance;
     private Gameplay gameplay;
     private MahjongClient client;
 
+    static {
+        String localIP1;
+        try {
+            localIP1 = InetAddress.getLocalHost().getHostAddress();
+        } catch (UnknownHostException _) {
+            localIP1 = InetAddress.getLoopbackAddress().getHostAddress();
+        }
+        localIP = localIP1;
+    }
+    
     @Override
     public void init() throws Exception {
         TileImage.init();
@@ -42,9 +56,5 @@ public class Mahjong extends Application {
 
     public static void setGameStage(GameStage stage) {
         Platform.runLater(() -> Mahjong.instance.gameplay.setGameStage(stage));
-    }
-
-    public static Mahjong getInstance() {
-        return instance;
     }
 }

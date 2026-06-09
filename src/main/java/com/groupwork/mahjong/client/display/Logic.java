@@ -27,7 +27,7 @@ public class Logic {
         }
         while (true) {
             int result =
-                    MahjongClient.getInstance().connect(InetAddress.getLoopbackAddress(), true);
+                    MahjongClient.getInstance().connect(InetAddress.getLoopbackAddress());
             if (result == 0) break;
             try {
                 Thread.sleep(200);
@@ -53,7 +53,7 @@ public class Logic {
                 }
             } else return;
         }
-        int result = MahjongClient.getInstance().connect(address, false);
+        int result = MahjongClient.getInstance().connect(address);
         if (result != 0) {
             Util.showAlert(Alert.AlertType.ERROR, "错误", "连接失败!", "网络超时或服务器不存在");
         }
